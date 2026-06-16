@@ -1,50 +1,60 @@
 // --- ANIMATION PARAMETERS ---
-// To see the animation, go to: View -> Animate
-// Set "FPS" to 30 and "Steps" to 100 in the bottom right panel.
+// Go to: View -> Animate. Set FPS to 30, Steps to 100 or 200.
 
 $fn = 40; 
 
-// Base gear properties
+// Base gear properties (The Cutter)
 teeth = 12;
 modulus = 2;
 thickness = 6;
 bore = 4;
 
 // Orbital properties
-orbital_radius = 50; // Distance from the "Sun" (center) to the gear
-orbit_speed = 1;     // How many orbits per cycle
-spin_speed = 4;      // How many self-rotations per cycle
+orbital_radius = 36; // Lowered to 36 so the gears actually intersect!
+orbit_speed = 1;     
+spin_speed = 4;      // Must be mathematically proportional to generate real teeth
 
-// --- MAIN EXECUTION ---
+// --- GENERATIVE SCULPTING EXECUTION ---
 
-// 1. Draw a marker at the center (The "Sun")
-color("red") cylinder(d=50, h=thickness+2, center=true);
+// 1. The Sculpted Sun Cylinder
+color("red")
+difference() {
+    // The blank cylinder we want to carve
+    cylinder(d=58, h=thickness, center=true);
+    
+    // We loop from 0 to the current animation time ($t)
+    // "steps = 150" controls how smooth/dense the cut cuts are.
+    let(steps = 150)
+    for (step = [0 : steps * $t]) {
+        let(progress = step / steps) // Simulated time from 0.0 to $t
+        
+        // Place a destructive cutter gear at this historical frame
+        planetary_gear_position(orbital_radius, orbit_speed, spin_speed, progress) {
+            // We scale the cutter up by 1.02 just to add a tiny bit of backlash clearance
+            scale([1.02, 1.02, 1.1]) 
+            gear(teeth, modulus, thickness, bore, 0, thickness);
+        }
+    }
+}
 
-// 2. Call the planetary module using OpenSCAD's internal time variable ($t)
-planetary_gear(orbital_radius, orbit_speed, spin_speed) {
-    // Pass the original gear into the module
+// 2. The Visual Planet Gear (The one you see moving in real-time)
+planetary_gear_position(orbital_radius, orbit_speed, spin_speed, $t) {
     gear(teeth, modulus, thickness, bore, 10, thickness);
 }
 
-// --- PLANETARY MODULE ---
-module planetary_gear(radius, o_speed, s_speed) {
-    // 3. Orbit around the central origin
-    rotate([0, 0, $t * 360 * o_speed]) 
-    
-    // 2. Push the gear out to its orbital path
+
+// --- POSITIONING MODULE ---
+// Replaced $t with a custom 'time_val' variable so we can loop through history
+module planetary_gear_position(radius, o_speed, s_speed, time_val) {
+    rotate([0, 0, time_val * 360 * o_speed]) 
     translate([radius, 0, 0]) 
-    
-    // 1. Spin the gear on its own axis
-    rotate([0, 0, $t * 360 * s_speed]) 
-    
-    // Children references whatever 3D object you put inside this module bracket
+    rotate([0, 0, time_val * 360 * s_speed]) 
     children(); 
 }
 
-// --- BASE GEAR MODULES (From previous step) ---
+// --- BASE GEAR MODULES ---
 module gear(num_teeth, mod, thick, bore, hub_dia, hub_thick) {
     pitch_dia = num_teeth * mod;
-    outer_dia = pitch_dia + (2 * mod);
     root_dia = pitch_dia - (2.5 * mod);
     
     color("LightSeaGreen")
@@ -60,7 +70,7 @@ module gear(num_teeth, mod, thick, bore, hub_dia, hub_thick) {
                 cylinder(d = hub_dia, h = hub_thick, center = true);
             }
         }
-        cylinder(d = bore, h = max(thick, hub_thick) + 2, center = true);
+        if (bore > 0) cylinder(d = bore, h = max(thick, hub_thick) + 2, center = true);
     }
 }
 
